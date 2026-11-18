@@ -2,11 +2,12 @@ import requests
 import sqlite3
 from fastapi.responses import HTMLResponse
 from datetime import datetime
-from fastapi import FastAPI
+from fastapi import FastAPI, Form
 from config import API_KEY
 
 app = FastAPI()
 
+# 调用大模型
 def ask_deepseek(quote):
     url = "https://api.deepseek.com/chat/completions"
     headers = {
@@ -24,6 +25,7 @@ def ask_deepseek(quote):
     data = resp.json()
     return data["choices"][0]["message"]["content"]
 
+# 存入数据库
 def save_quote(quote, source, author, comment):
     conn = sqlite3.connect('quotes.db')
     cursor = conn.cursor()
@@ -75,42 +77,59 @@ def get_history():
 
 @app.get("/")
 def index():
+    # 获取历史记录
     history = get_history()
 
     items = ""
+    # 遍历历史记录，拼接字符串
     for r in history:
         items += f"<li><b>{r['hitokoto']}</b>（{r['source']}）<br>{r['ai_comment']}</li>"
-
+    # 网页结构
     html = f"""<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"><title>一言AI解读</title></head>
 <body>
     <h1>一言AI解读</h1>
-    <p>访问 <a href="/hitokoto">/hitokoto</a>随机生成名言+AI解读；或<a href="/hitokoto?text=你想解读的话">指定句子</a>。</p>
+    <form action="/explain" method="post">
+        <input type="text" name="text" placeholder="输入一句你想解读的话" size="40">
+        <button type="submit">解读</button>
+    </form>
+    <p>访问 <a href="/hitokoto">/hitokoto</a>随机生成名言+AI解读</p>
     <hr>
     <h2>历史记录(共{len(history)}条)</h2>
     <ul>{items}</ul>
 </body>
 </html>"""
+    # 渲染页面
+    return HTMLResponse(html)
+
+@app.post("/explain")
+def explain(text: str = Form("")):
+    text = text.strip()
+    if text == '':
+        return HTMLResponse("<p>输入不能为空，请重新输入。</p><p><a href='/'>返回首页</a></p>")
+    if len(text) > 200:
+        return HTMLResponse("<p>输入太长，请控制在 200 字以内。</p><p><a href='/'>返回首页</a></p>")
+
+    try:
+        comment = ask_deepseek(text)
+        save_quote(text, "用户输入", None, comment)
+    except Exception as e:
+        return HTMLResponse(f"<p>解读失败：{e}</p><p><a href='/'>返回首页</a></p>")
+
+    html = f"""<!DOCTYPE html>
+    <html>
+    <head><meta charset="utf-8"><title>解读结果</title></head>
+    <body>
+        <h1>解读结果</h1>
+        <h2>{text}</h2>
+        <p><b>AI 解读：</b>{comment}</p>
+        <p><a href="/">再试一句</a></p>
+    </body>
+    </html>"""
     return HTMLResponse(html)
 
 @app.get("/hitokoto")
-# def get_hitokoto():
-#     try:
-#         resp = requests.get('https://v1.hitokoto.cn/')
-#         data = resp.json()
-#         quote = data['hitokoto']
-#         comment = ask_deepseek(quote)
-#         save_quote(quote, data['from'], data['from_who'], comment) # 存进数据库
-#         return {
-#             "hitokoto": quote,
-#             "from": data['from'],
-#             "from_who": data['from_who'],
-#             "ai_comment": comment
-#         }
-#     except Exception as e:
-#         return {"error": f"接口调用失败:{e}"}
-
 def get_hitokoto(text: str = None):
     try:
         if text:
