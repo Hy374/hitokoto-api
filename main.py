@@ -95,3 +95,12 @@ def get_hitokoto():
 def history():
     return get_history()
 
+
+
+if __name__ == "__main__": # 只有运行这个文件才会执行
+    import os
+    import uvicorn
+    # host="0.0.0.0" -> 让服务对外可访问(0.0.0.0 是所有人都能访问)
+    # port=int(os.environ.get("PORT", 8000)) -> 端口从环境变量PORT读，没有就用8000
+    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 8000)))
+
