@@ -1,5 +1,6 @@
 import requests
 import sqlite3
+from fastapi.responses import HTMLResponse
 from datetime import datetime
 from fastapi import FastAPI
 from config import API_KEY
@@ -72,24 +73,69 @@ def get_history():
         })
     return result
 
+@app.get("/")
+def index():
+    history = get_history()
+
+    items = ""
+    for r in history:
+        items += f"<li><b>{r['hitokoto']}</b>（{r['source']}）<br>{r['ai_comment']}</li>"
+
+    html = f"""<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>一言AI解读</title></head>
+<body>
+    <h1>一言AI解读</h1>
+    <p>访问 <a href="/hitokoto">/hitokoto</a>随机生成名言+AI解读；或<a href="/hitokoto?text=你想解读的话">指定句子</a>。</p>
+    <hr>
+    <h2>历史记录(共{len(history)}条)</h2>
+    <ul>{items}</ul>
+</body>
+</html>"""
+    return HTMLResponse(html)
 
 @app.get("/hitokoto")
-def get_hitokoto():
+# def get_hitokoto():
+#     try:
+#         resp = requests.get('https://v1.hitokoto.cn/')
+#         data = resp.json()
+#         quote = data['hitokoto']
+#         comment = ask_deepseek(quote)
+#         save_quote(quote, data['from'], data['from_who'], comment) # 存进数据库
+#         return {
+#             "hitokoto": quote,
+#             "from": data['from'],
+#             "from_who": data['from_who'],
+#             "ai_comment": comment
+#         }
+#     except Exception as e:
+#         return {"error": f"接口调用失败:{e}"}
+
+def get_hitokoto(text: str = None):
     try:
-        resp = requests.get('https://v1.hitokoto.cn/')
-        data = resp.json()
-        quote = data['hitokoto']
+        if text:
+            # 用户传了句子，就解读这句
+            quote = text
+            source = "用户输入"
+            author = None
+        else:
+            # 没传，就随机拿一句名言
+            resp = requests.get('https://v1.hitokoto.cn/')
+            data = resp.json()
+            quote = data['hitokoto']
+            source = data['from']
+            author = data['from_who']
+
         comment = ask_deepseek(quote)
-        save_quote(quote, data['from'], data['from_who'], comment) # 存进数据库
+        save_quote(quote, source, author, comment)
         return {
             "hitokoto": quote,
-            "from": data['from'],
-            "from_who": data['from_who'],
+            "from": source,
+            "from_who": author,
             "ai_comment": comment
         }
     except Exception as e:
-        return {"error": f"接口调用失败:{e}"}
-
+        return {"error":f"接口调用失败:{e}"}
 
 @app.get("/history")
 def history():
