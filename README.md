@@ -6,9 +6,10 @@
 - 提供 /hitokoto 接口，返回随机名言、出处、作者
 - 带异常处理，接口失败时返回友好错误提示
 - 调用 DeepSeek 大模型，对名言自动生成一句 AI 解读
+- 数据存入SQLite数据库，/history 接口可查询历史记录
 
 ## 技术栈
-- Python、FastAPI、requests
+- Python、FastAPI、requests、SQLite、DeepSeek API
 
 ## 如何运行
 1.安装依赖：pip install fastapi uvicorn requests
@@ -17,3 +18,4 @@
 
 # 接口说明
 GET /hitokoto  →  返回 {"hitokoto":"...","from":"...","from_who":"...","ai_comment":"..."}
+GET /history  -> 返回所有历史记录（倒序）
